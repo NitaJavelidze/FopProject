@@ -18,7 +18,15 @@ public class SwiftInterpreter {
             // Handle while loops
             else if (line.startsWith("while")) {
                 index = handleWhileLoop(lines, index);
-                continue; // `handleWhileLoop` adjusts the index
+                continue; // handleWhileLoop adjusts the index
+            }
+            else if (line.startsWith("if")) {
+                index = handleIfStatement(lines, index);
+                continue;
+            }
+            else if (line.startsWith("for")) {
+                index = handleForLoop(lines, index);
+                continue; 
             }
             if (line.endsWith("}")) {
             	index++;
@@ -50,7 +58,67 @@ public class SwiftInterpreter {
         
         variables.put(varName, evaluateExpression(value));
     }
+    private int handleForLoop(String[] lines, int index) {
+        String line = lines[index].trim();
+        if (!line.startsWith("for") || !line.contains("in") || !line.endsWith("{")) {
+            throw new IllegalArgumentException("Invalid for loop syntax: " + line);
+        }
 
+        // Parse the loop declaration
+        String[] parts = line.split("in");
+        String loopVariable = parts[0].trim().substring(4).trim(); // Extract the variable (e.g., "i")
+        String range = parts[1].trim().replace("{", ""); // Extract the range (e.g., "1...N" or "1..<N")
+
+        // Determine the start and end of the range
+        boolean isInclusive = range.contains("...");
+        String[] rangeParts = range.split("\\.\\.\\.");
+        int start = evaluateExpression(rangeParts[0].trim());
+        int end = evaluateExpression(rangeParts[1].trim());
+        if (!isInclusive) {
+            end--; // Adjust for exclusive range ("..<")
+        }
+
+        // Collect the loop body
+        StringBuilder loopBody = new StringBuilder();
+        index++; // Move to the next line after "for i in range {"
+        while (index < lines.length && !lines[index].trim().equals("}")) {
+            loopBody.append(lines[index].trim()).append("\n");
+            index++;
+        }
+
+        // Execute the loop
+        for (int i = start; i <= end; i++) {
+            variables.put(loopVariable, i); // Update the loop variable
+            eval(loopBody.toString()); // Execute the loop body
+        }
+
+        return index; // Return the index after the loop body
+    }
+
+    private int handleIfStatement(String[] lines, int index) {
+        String line = lines[index].trim();
+        if (!line.startsWith("if") || !line.endsWith("{")) {
+            throw new IllegalArgumentException("Invalid if statement syntax: " + line);
+        }
+
+        // Extract the condition inside the parentheses, remove "if " and "{"
+        String condition = line.substring(2, line.length() - 1).trim(); // Remove "if" and "{"
+    // Collect all lines in the if block until we encounter "}"
+    StringBuilder ifBlock = new StringBuilder();
+    index++; // Move to the next line after "if condition {"
+
+    while (index < lines.length && !lines[index].trim().equals("}")) {
+        ifBlock.append(lines[index].trim()).append("\n");
+        index++;
+    }
+
+    // Evaluate the condition
+    if (evaluateCondition(condition)) {
+        eval(ifBlock.toString()); // Execute the if block
+    }
+
+    return index; // Return the index after the if block
+}
     private int handleWhileLoop(String[] lines, int index) {
         // Handle the while condition, after "while"
         String line = lines[index].trim();
@@ -72,6 +140,7 @@ public class SwiftInterpreter {
         }
         return index; // Return the index after the loop, which should be at the line containing "}"
     }
+    
     private boolean evaluateCondition(String condition) {
         // Split condition (e.g., "i<=n") into parts
         String[] parts = condition.split("<=|>=|<|>|==");
@@ -93,14 +162,49 @@ public class SwiftInterpreter {
     }
 
     private int evaluateExpression(String expression) {
-        // Split the expression into terms (e.g., sum + i)
-        String[] tokens = expression.split("\\+");
-        int sum = 0;
-        for (String token : tokens) {
-            token = token.trim();
-            sum += variables.containsKey(token) ? variables.get(token) : Integer.parseInt(token);
+        // Remove any extra whitespace
+        expression = expression.trim();
+
+        // Check for multiplication, division, addition, or subtraction
+        if (expression.contains("*")) {
+            String[] tokens = expression.split("\\*");
+            int result = 1;
+            for (String token : tokens) {
+                token = token.trim();
+                result *= variables.containsKey(token) ? variables.get(token) : Integer.parseInt(token);
+            }
+            return result;
+        } else if (expression.contains("/")) {
+            String[] tokens = expression.split("/");
+            int result = variables.containsKey(tokens[0].trim()) ? variables.get(tokens[0].trim()) : Integer.parseInt(tokens[0].trim());
+            for (int i = 1; i < tokens.length; i++) {
+                String token = tokens[i].trim();
+                int value = variables.containsKey(token) ? variables.get(token) : Integer.parseInt(token);
+                result /= value;
+            }
+            return result;
+        } else if (expression.contains("-")) {
+            String[] tokens = expression.split("-");
+            int result = variables.containsKey(tokens[0].trim()) ? variables.get(tokens[0].trim()) : Integer.parseInt(tokens[0].trim());
+            for (int i = 1; i < tokens.length; i++) {
+                String token = tokens[i].trim();
+                int value = variables.containsKey(token) ? variables.get(token) : Integer.parseInt(token);
+                result -= value;
+            }
+            return result;
+        } else if (expression.contains("+")) {
+            String[] tokens = expression.split("\\+");
+            int sum = 0;
+            for (String token : tokens) {
+                token = token.trim();
+                sum += variables.containsKey(token) ? variables.get(token) : Integer.parseInt(token);
+            }
+            return sum;
         }
-        return sum;
+
+        // If no operator, it must be a single number or variable
+        return variables.containsKey(expression) ? variables.get(expression) : Integer.parseInt(expression);
+    
     }
 
     private void handleAssignment(String line) {
@@ -118,22 +222,33 @@ public class SwiftInterpreter {
        
         System.out.println(variables.getOrDefault(varName, 0)); // Print variable value or 0 if undefined
     }
+}                                                    public class Main {
+public static void main(String[] args) {
+    SwiftInterpreter interpreter = new SwiftInterpreter();
+/* sum of first n nums
+    String program = """
+        let n=10
+        var sum=0
+        var i=1
+        while i<=n {
+            sum=sum+i
+            i=i+1 
+            }
+        print(sum)
+    """;
+    */
+  String program = """
+		  let N = 5
+    		var output = 1
+    		if N > 0 {
+    		    for i in 1...N {
+    		        output =output * i
+    		    }
+    		}
+    		print(output)
+    		
+  		""";
 
-    public static void main(String[] args) {
-        SwiftInterpreter interpreter = new SwiftInterpreter();
-
-        String program = """
-            let n=10
-            var sum=0
-            var i=1
-            while i<=n {
-                sum=sum+i
-                i=i+1 
-                }
-            print(sum)
-        """;
- 
-        interpreter.eval(program); // This should execute the program and print 55
-       
-    }
+    interpreter.eval(program); 
+}
 }
