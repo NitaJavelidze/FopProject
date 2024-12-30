@@ -1,4 +1,6 @@
 For this group project we had to build an interpreter for following Swift algorithms:
+
+
 1.sum of first n numbers
 
 var N = 10
