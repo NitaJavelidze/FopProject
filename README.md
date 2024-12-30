@@ -93,4 +93,4 @@ print(reversed)
 
 
 
-In this project we used these subsets of swift:  let, var, while, if, for, print and basic arithmetics
+In this project we used these subsets of Swift:  let, var, while, if, for, print and basic arithmetics
