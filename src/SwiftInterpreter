@@ -1,0 +1,246 @@
+import java.util.*;
+
+public class SwiftInterpreter {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        List<String> swiftCode = new ArrayList<>();
+
+        // Step 1: Reader
+        System.out.println("Step 1: Enter your Swift code (type 'END' to finish):");
+        while (true) {
+            String line = scanner.nextLine().trim();
+            if (line.equalsIgnoreCase("END")) break;
+            swiftCode.add(line);
+        }
+
+        System.out.println("\nSwift code received:");
+        for (String line : swiftCode) {
+            System.out.println(line);
+        }
+
+        // Step 2: Syntax Checker
+        System.out.println("\nStep 2: Syntax Checker");
+        if (!checkSyntax(swiftCode)) {
+            System.out.println("Syntax errors detected. Exiting program.");
+            return;
+        }
+        System.out.println("Syntax is valid.");
+
+        // Step 3: Translator
+        System.out.println("\nStep 3: Translator");
+        String translatedCode = translateToJava(swiftCode);
+        System.out.println("Translated Java Code:\n" + translatedCode);
+
+        // Step 4: Execution
+        System.out.println("\nStep 4: Execution");
+        executeSwift(swiftCode);
+
+        scanner.close();
+    }
+
+    private static boolean checkSyntax(List<String> swiftCode) {
+        boolean isValid = true;
+
+        for (String line : swiftCode) {
+            line = line.trim();
+
+            if (line.startsWith("func")) {
+                if (!line.contains("(") || !line.contains(")") || !line.endsWith("{")) {
+                    System.out.println("Syntax Error: Invalid function declaration - " + line);
+                    isValid = false;
+                }
+            } else if (line.startsWith("print(")) {
+                if (!line.endsWith(")")) {
+                    System.out.println("Syntax Error: Invalid print statement - " + line);
+                    isValid = false;
+                }
+            } else if (line.startsWith("var") || line.startsWith("let")) {
+                if (!line.contains("=")) {
+                    System.out.println("Syntax Error: Missing '=' in variable declaration - " + line);
+                    isValid = false;
+                }
+            } else if (line.startsWith("for")) {
+                if (!line.contains(" in ") || !line.contains("...")) {
+                    System.out.println("Syntax Error: Invalid for-loop syntax - " + line);
+                    isValid = false;
+                }
+            } else if (line.startsWith("while")) {
+                if (!line.endsWith("{")) {
+                    System.out.println("Syntax Error: Invalid while-loop syntax - " + line);
+                    isValid = false;
+                }
+            } else if (line.startsWith("return") || line.endsWith("}") || line.isEmpty()) {
+                continue;
+            } else if (line.matches(".*[\\+=\\-*/%].*")) {
+                continue;
+            } else {
+                System.out.println("Syntax Error: Invalid Swift syntax - " + line);
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    private static String translateToJava(List<String> swiftCode) {
+        StringBuilder javaCode = new StringBuilder();
+        for (String line : swiftCode) {
+            if (line.startsWith("func")) {
+                javaCode.append(line.replace("func", "public static int")
+                                .replace("->", " ")
+                                .replace(":", ""))
+                        .append(" {\n");
+            } else if (line.startsWith("var") || line.startsWith("let")) {
+                javaCode.append(line.replace("let", "int")
+                                .replace("var", "int")
+                                .replace(":", ""))
+                        .append(";\n");
+            } else if (line.startsWith("for")) {
+                javaCode.append(line.replace(" in ", " <= ")
+                                .replace("...n", "; i++"))
+                        .append("\n");
+            } else if (line.startsWith("print")) {
+                javaCode.append(line.replace("print", "System.out.println")).append(";\n");
+            } else if (line.startsWith("return")) {
+                javaCode.append(line).append(";\n");
+            } else {
+                javaCode.append(line).append("\n");
+            }
+        }
+        return javaCode.toString();
+    }
+
+    private static void executeSwift(List<String> swiftCode) {
+        Map<String, Integer> variables = new HashMap<>();
+
+        for (String line : swiftCode) {
+            line = line.trim();
+
+            if (line.startsWith("var") || line.startsWith("let")) {
+                String[] parts = line.split("=");
+                String varName = parts[0].replace("var", "").replace("let", "").trim();
+                int value = (int) evaluateExpression(parts[1].trim(), variables);
+                variables.put(varName, value);
+            } else if (line.startsWith("print(")) {
+                String expression = line.substring(6, line.length() - 1).trim();
+                Object result = evaluateExpression(expression, variables);
+                System.out.println(result);
+            } else if (line.matches("^[a-zA-Z_][a-zA-Z0-9_]*\\(.*\\)$")) {
+                String functionName = line.substring(0, line.indexOf("("));
+                String args = line.substring(line.indexOf("(") + 1, line.lastIndexOf(")"));
+                Object result = executeFunctionAndReturn(functionName, args, variables);
+                System.out.println(result);
+            }
+        }
+    }
+
+    private static Object evaluateExpression(String expression, Map<String, Integer> variables) {
+        expression = expression.trim();
+
+        if (variables.containsKey(expression)) {
+            return variables.get(expression);
+        } else if (expression.matches("\\d+")) {
+            return Integer.parseInt(expression);
+        } else if (expression.equalsIgnoreCase("true")) {
+            return true;
+        } else if (expression.equalsIgnoreCase("false")) {
+            return false;
+        } else if (expression.contains("+")) {
+            String[] operands = expression.split("\\+");
+            return evaluateOperand(operands[0], variables) + evaluateOperand(operands[1], variables);
+        } else if (expression.matches("^[a-zA-Z_][a-zA-Z0-9_]*\\(.*\\)$")) {
+            String functionName = expression.substring(0, expression.indexOf("("));
+            String args = expression.substring(expression.indexOf("(") + 1, expression.lastIndexOf(")"));
+            return executeFunctionAndReturn(functionName, args, variables);
+        }
+        return 0;
+    }
+
+    private static int evaluateOperand(String operand, Map<String, Integer> variables) {
+        operand = operand.trim();
+        if (variables.containsKey(operand)) {
+            return variables.get(operand);
+        } else {
+            return Integer.parseInt(operand);
+        }
+    }
+
+    private static Object executeFunctionAndReturn(String functionName, String args, Map<String, Integer> variables) {
+        int n;
+        switch (functionName) {
+            case "sumOfFirstNNumbers":
+                n = (int) evaluateExpression(args.trim(), variables);
+                return n * (n + 1) / 2;
+            case "factorial":
+                n = (int) evaluateExpression(args.trim(), variables);
+                int result = 1;
+                for (int i = 1; i <= n; i++) {
+                    result *= i;
+                }
+                return result;
+            case "gcd":
+                String[] numbers = args.split(",");
+                int a = (int) evaluateExpression(numbers[0].trim(), variables);
+                int b = (int) evaluateExpression(numbers[1].trim(), variables);
+                while (b != 0) {
+                    int temp = b;
+                    b = a % b;
+                    a = temp;
+                }
+                return a;
+            case "reverseNumber":
+                n = (int) evaluateExpression(args.trim(), variables);
+                int reversed = 0;
+                while (n > 0) {
+                    int digit = n % 10;
+                    reversed = reversed * 10 + digit;
+                    n /= 10;
+                }
+                return reversed;
+            case "isPalindrome":
+                n = (int) evaluateExpression(args.trim(), variables);
+                int original = n, reverse = 0;
+                while (n > 0) {
+                    int digit = n % 10;
+                    reverse = reverse * 10 + digit;
+                    n /= 10;
+                }
+                return original == reverse;
+            case "isPrime":
+                n = (int) evaluateExpression(args.trim(), variables);
+                if (n <= 1) return false;
+                for (int i = 2; i <= Math.sqrt(n); i++) {
+                    if (n % i == 0) return false;
+                }
+                return true;
+            case "largestDigit":
+                n = (int) evaluateExpression(args.trim(), variables);
+                int maxDigit = 0;
+                while (n > 0) {
+                    int digit = n % 10;
+                    maxDigit = Math.max(maxDigit, digit);
+                    n /= 10;
+                }
+                return maxDigit;
+            case "sumOfDigits":
+                n = (int) evaluateExpression(args.trim(), variables);
+                int sum = 0;
+                while (n > 0) {
+                    sum += n % 10;
+                    n /= 10;
+                }
+                return sum;
+            case "fibonacci":
+                n = (int) evaluateExpression(args.trim(), variables);
+                if (n <= 1) return n;
+                int a1 = 0, b1 = 1;
+                for (int i = 2; i <= n; i++) {
+                    int temp = a1 + b1;
+                    a1 = b1;
+                    b1 = temp;
+                }
+                return b1;
+        }
+        return 0;
+    }
+}
