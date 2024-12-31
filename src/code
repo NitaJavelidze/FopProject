@@ -1,28 +1,248 @@
-import java.util.Scanner;
+import java.util.*;
+import java.util.regex.*;
 
 public class SwiftInterpreter {
+    private static final Map<String, Object> variableStore = new HashMap<>();
+    private static final Map<String, Boolean> constantStore = new HashMap<>();
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter a simple Swift-like operation (e.g., print(2 + 3)): ");
-        String input = scanner.nextLine();
+        System.out.println("Swift Interpreter - Enter your program. Type 'END' on a new line to execute:");
 
-        if (input.startsWith("print(") && input.endsWith(")")) {
-            String expression = input.substring(6, input.length() - 1).trim();
-            try {
-                if (expression.contains("+")) {
-                    String[] parts = expression.split("\\+");
-                    int result = Integer.parseInt(parts[0].trim()) + Integer.parseInt(parts[1].trim());
-                    System.out.println(result);
-                } else {
-                    System.out.println("Unsupported operation.");
-                }
-            } catch (Exception e) {
-                System.out.println("Error interpreting the input.");
+        // Read user input for the program
+        StringBuilder programBuilder = new StringBuilder();
+        while (scanner.hasNextLine()) {
+            String line = scanner.nextLine().trim();
+            if (line.equalsIgnoreCase("END")) {
+                break;
             }
-        } else {
-            System.out.println("Invalid Swift-like input.");
+            programBuilder.append(line).append("\n");
+        }
+
+        // Program to run
+        String program = programBuilder.toString();
+
+        try {
+            executeProgram(program);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
 
         scanner.close();
+    }
+
+    public static void executeProgram(String code) throws Exception {
+        // Split code into lines
+        String[] lines = code.split("\n");
+        Deque<Integer> loopStack = new ArrayDeque<>();
+        int i = 0;
+
+        while (i < lines.length) {
+            String line = lines[i].trim();
+
+            if (line.startsWith("var ") || line.startsWith("let ")) {
+                handleVariableDeclaration(line);
+            } else if (line.startsWith("print(")) {
+                handlePrintStatement(line);
+            } else if (line.startsWith("if ")) {
+                i = handleIfCondition(i, lines, loopStack);
+            } else if (line.startsWith("while ")) {
+                i = handleWhileLoop(i, lines, loopStack);
+            } else if (line.startsWith("for ")) {
+                i = handleForLoop(i, lines, loopStack);
+            } else if (line.equals("}")) {
+                if (loopStack.isEmpty()) {
+                    throw new Exception("Unexpected closing brace '}' at line " + (i + 1));
+                }
+                i = loopStack.pop() - 1;
+            } else if (line.contains("=") && !line.contains("==")) { // Detect assignment
+                handleAssignment(line);
+            } else if (!line.isEmpty()) {
+                evaluateExpression(line);
+            }
+            i++;
+        }
+    }
+
+    private static void handleVariableDeclaration(String line) throws Exception {
+        // Check if the variable is constant (declared with 'let')
+        boolean isConstant = line.startsWith("let ");
+        // Remove the "let " or "var " prefix
+        String declaration = line.substring(isConstant ? 4 : 4).trim();
+        // Split the declaration by "=" to separate the variable name and the value
+        String[] parts = declaration.split("=");
+        if (parts.length != 2) {
+            throw new Exception("Invalid variable declaration: " + line);
+        }
+
+        String varName = parts[0].trim(); // Extract the variable name
+        String value = parts[1].trim();  // Extract the value or expression to evaluate
+
+        // Check if the variable name is already declared
+        if (variableStore.containsKey(varName)) {
+            throw new Exception("Variable already declared: " + varName);
+        }
+
+        // Evaluate the value
+        Object evaluatedValue = evaluateExpression(value);
+        // Store the variable in the variable store
+        variableStore.put(varName, evaluatedValue);
+
+        // If it is a constant, mark it as such in the constant store
+        if (isConstant) {
+            constantStore.put(varName, true);
+        }
+    }
+
+    private static void handleAssignment(String line) throws Exception {
+        // Split the assignment by "=" to separate the variable name and the new value
+        String[] parts = line.split("=");
+        if (parts.length != 2) {
+            throw new Exception("Invalid assignment: " + line);
+        }
+
+        String varName = parts[0].trim(); // Extract the variable name
+        String expression = parts[1].trim(); // Extract the new value or expression
+
+        // Check if the variable is declared
+        if (!variableStore.containsKey(varName)) {
+            throw new Exception("Variable not declared: " + varName);
+        }
+
+        // Check if the variable is a constant (let)
+        if (constantStore.getOrDefault(varName, false)) {
+            throw new Exception("Cannot modify a constant variable: " + varName);
+        }
+
+        // Evaluate the new value
+        Object evaluatedValue = evaluateExpression(expression);
+        // Update the variable in the variable store
+        variableStore.put(varName, evaluatedValue);
+    }
+
+    private static void handlePrintStatement(String line) throws Exception {
+        String content = line.substring(6, line.length() - 1).trim(); // Extract content inside print()
+        Object result = evaluateExpression(content);
+        System.out.println(result);
+    }
+
+    private static int handleIfCondition(int index, String[] lines, Deque<Integer> stack) throws Exception {
+        String condition = lines[index].substring(3, lines[index].length() - 1).trim(); // Extract condition
+        boolean conditionResult = (boolean) evaluateExpression(condition);
+
+        if (!conditionResult) {
+            // Skip to matching '}'
+            index = skipBlock(index, lines);
+        }
+        return index;
+    }
+
+    private static int handleWhileLoop(int index, String[] lines, Deque<Integer> stack) throws Exception {
+        String condition = lines[index].substring(6, lines[index].length() - 1).trim(); // Extract condition
+        if (!(boolean) evaluateExpression(condition)) {
+            return skipBlock(index, lines);
+        }
+        stack.push(index); // Push the current index to loop stack
+        return index;
+    }
+
+    private static int handleForLoop(int index, String[] lines, Deque<Integer> stack) throws Exception {
+        Matcher matcher = Pattern.compile("for (.?) in (.?)\\.\\.\\.(.*?) \\{").matcher(lines[index]);
+        if (!matcher.matches()) {
+            throw new Exception("Invalid for-loop syntax at line " + (index + 1));
+        }
+        String varName = matcher.group(1).trim();
+        int start = (int) evaluateExpression(matcher.group(2).trim());
+        int end = (int) evaluateExpression(matcher.group(3).trim());
+
+        variableStore.put(varName, start); // Initialize loop variable
+        if ((int) variableStore.get(varName) > end) {
+            return skipBlock(index, lines); // Skip block if condition is false
+        }
+
+        stack.push(index); // Push current index to loop stack
+        return index;
+    }
+
+    private static int skipBlock(int index, String[] lines) {
+        int braceCount = 0;
+        while (index < lines.length) {
+            String line = lines[index].trim();
+            if (line.startsWith("{")) {
+                braceCount++;
+            } else if (line.startsWith("}")) {
+                braceCount--;
+                if (braceCount == 0) {
+                    break;
+                }
+            }
+            index++;
+        }
+        return index;
+    }
+
+    private static Object evaluateExpression(String expression) throws Exception {
+        expression = expression.trim();
+
+        // Handle relational operators
+        if (expression.contains("==")) {
+            String[] parts = expression.split("==");
+            return evaluateExpression(parts[0]).equals(evaluateExpression(parts[1]));
+        } else if (expression.contains("<=")) {
+            String[] parts = expression.split("<=");
+            return toDouble(evaluateExpression(parts[0])) <= toDouble(evaluateExpression(parts[1]));
+        } else if (expression.contains(">=")) {
+            String[] parts = expression.split(">=");
+            return toDouble(evaluateExpression(parts[0])) >= toDouble(evaluateExpression(parts[1]));
+        } else if (expression.contains("<")) {
+            String[] parts = expression.split("<");
+            return toDouble(evaluateExpression(parts[0])) < toDouble(evaluateExpression(parts[1]));
+        } else if (expression.contains(">")) {
+            String[] parts = expression.split(">");
+            return toDouble(evaluateExpression(parts[0])) > toDouble(evaluateExpression(parts[1]));
+        } else if (expression.contains("!=")) {
+            String[] parts = expression.split("!=");
+            return !evaluateExpression(parts[0]).equals(evaluateExpression(parts[1]));
+        }
+
+        // Evaluate arithmetic expressions using regex
+        Pattern mathPattern = Pattern.compile("(.?)([+\\-/%])(.*)");
+        Matcher matcher = mathPattern.matcher(expression);
+        if (matcher.matches()) {
+            double left = toDouble(evaluateExpression(matcher.group(1).trim()));
+            String operator = matcher.group(2).trim();
+            double right = toDouble(evaluateExpression(matcher.group(3).trim()));
+
+            return switch (operator) {
+                case "+" -> left + right;
+                case "-" -> left - right;
+                case "*" -> left * right;
+                case "/" -> left / right;
+                case "%" -> left % right;
+                default -> throw new Exception("Unsupported operator: " + operator);
+            };
+        }
+
+        // Variable lookup
+        if (variableStore.containsKey(expression)) {
+            return variableStore.get(expression);
+        }
+
+        // Parse numbers
+        try {
+            return Integer.parseInt(expression);
+        } catch (NumberFormatException ignored) {
+            throw new Exception("Invalid expression: " + expression);
+        }
+    }
+
+    private static double toDouble(Object obj) {
+        if (obj instanceof Integer) {
+            return ((Integer) obj).doubleValue();
+        } else if (obj instanceof Double) {
+            return (Double) obj;
+        } else {
+            throw new IllegalArgumentException("Cannot convert to double: " + obj);
+        }
     }
 }
