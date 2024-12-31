@@ -225,7 +225,7 @@ public class SwiftInterpreter {
 }                                                    public class Main {
 public static void main(String[] args) {
     SwiftInterpreter interpreter = new SwiftInterpreter();
-/* sum of first n nums
+// sum of first n nums
     String program = """
         let n=10
         var sum=0
@@ -236,18 +236,8 @@ public static void main(String[] args) {
             }
         print(sum)
     """;
-    */
-  String program = """
-		  let N = 5
-    		var output = 1
-    		if N > 0 {
-    		    for i in 1...N {
-    		        output =output * i
-    		    }
-    		}
-    		print(output)
-    		
-  		""";
+    
+
 
     interpreter.eval(program); 
 }
