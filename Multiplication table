@@ -1,0 +1,88 @@
+import java.util.HashMap;
+import java.util.Map;
+
+public class SwiftInterpreter {
+    private final Map<String, Integer> variables = new HashMap<>(); // Variable storage
+
+    public void eval(String input) {
+        String[] lines = input.split("\n"); // Split by newlines
+        int index = 0;
+        while (index < lines.length) {
+            String line = lines[index].trim(); // Trim whitespace
+            if (line.isEmpty()) {
+                index++;
+                continue; // Skip empty lines
+            }
+            // Handle variable declarations (let or var)
+            if (line.startsWith("let ") || line.startsWith("var ")) {
+                handleVariableDeclaration(line);
+            }
+            // Handle expressions and assignments (e.g., sum = sum + i)
+            else if (line.contains("=")) {
+                handleAssignment(line);
+            }
+            // Handle print statements
+            else if (line.startsWith("print")) {
+                handlePrint(line);
+            } else {
+                throw new IllegalArgumentException("Unknown statement: " + line);
+            }
+            index++;
+        }
+    }
+
+    private void handleVariableDeclaration(String line) {
+        if (!line.contains("=")) {
+            throw new IllegalArgumentException("Invalid variable declaration: " + line);
+        }
+
+        String[] parts = line.split("=");
+        String declaration = parts[0].trim();
+        String value = parts.length > 1 ? parts[1].trim() : "0"; // Default value is 0
+
+        String varName = declaration.split(" ")[1]; // Extract variable name
+        variables.put(varName, evaluateExpression(value));
+    }
+
+    private void handleAssignment(String line) {
+        String[] parts = line.split("=");
+        String varName = parts[0].trim();
+        String expression = parts[1].trim();
+
+        // Evaluate the right-hand side expression
+        int value = evaluateExpression(expression);
+        variables.put(varName, value);
+    }
+
+    private void handlePrint(String line) {
+        String varName = line.substring(line.indexOf('(') + 1, line.indexOf(')')).trim();
+        System.out.println(variables.getOrDefault(varName, 0)); // Print variable value or 0 if undefined
+    }
+
+    private int evaluateExpression(String expression) {
+        expression = expression.trim();
+
+        // If the expression is a number, return it directly
+        try {
+            return Integer.parseInt(expression);
+        } catch (NumberFormatException e) {
+            // If it's a variable, return its value
+            return variables.getOrDefault(expression, 0);
+        }
+    }
+
+    // Multiplication table
+    public void multiplicationTable(int number) {
+        for (int i = 1; i <= 10; i++) {
+            System.out.println(number * i);
+        }
+    }
+
+    public static void main(String[] args) {
+        SwiftInterpreter interpreter = new SwiftInterpreter();
+
+        // Test the multiplication table function
+        int inputNumber = 5;
+        interpreter.multiplicationTable(inputNumber); // Output: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50
+    }
+}
