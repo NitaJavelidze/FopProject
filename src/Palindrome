@@ -1,0 +1,100 @@
+import java.util.HashMap;
+import java.util.Map;
+
+public class SwiftInterpreter {
+    private final Map<String, Integer> variables = new HashMap<>(); // Variable storage
+
+    public void eval(String input) {
+        String[] lines = input.split("\n"); // Split by newlines
+        int index = 0;
+        while (index < lines.length) {
+            String line = lines[index].trim(); // Trim whitespace
+            if (line.isEmpty()) {
+                index++;
+                continue; // Skip empty lines
+            }
+            // Handle variable declarations (let or var)
+            if (line.startsWith("let ") || line.startsWith("var ")) {
+                handleVariableDeclaration(line);
+            }
+            // Handle expressions and assignments (e.g., sum = sum + i)
+            else if (line.contains("=")) {
+                handleAssignment(line);
+            }
+            // Handle print statements
+            else if (line.startsWith("print")) {
+                handlePrint(line);
+            } else {
+                throw new IllegalArgumentException("Unknown statement: " + line);
+            }
+            index++;
+        }
+    }
+
+    private void handleVariableDeclaration(String line) {
+        if (!line.contains("=")) {
+            throw new IllegalArgumentException("Invalid variable declaration: " + line);
+        }
+
+        String[] parts = line.split("=");
+        String declaration = parts[0].trim();
+        String value = parts.length > 1 ? parts[1].trim() : "0"; // Default value is 0
+
+        String varName = declaration.split(" ")[1]; // Extract variable name
+        variables.put(varName, evaluateExpression(value));
+    }
+
+    private void handleAssignment(String line) {
+        String[] parts = line.split("=");
+        String varName = parts[0].trim();
+        String expression = parts[1].trim();
+
+        // Evaluate the right-hand side expression
+        int value = evaluateExpression(expression);
+        variables.put(varName, value);
+    }
+
+    private void handlePrint(String line) {
+        String varName = line.substring(line.indexOf('(') + 1, line.indexOf(')')).trim();
+        System.out.println(variables.getOrDefault(varName, 0)); // Print variable value or 0 if undefined
+    }
+
+    private int evaluateExpression(String expression) {
+        expression = expression.trim();
+
+        // If the expression is a number, return it directly
+        try {
+            return Integer.parseInt(expression);
+        } catch (NumberFormatException e) {
+            // If it's a variable, return its value
+            return variables.getOrDefault(expression, 0);
+        }
+    }
+
+    // Palindrome check function
+    public boolean isPalindrome(int number) {
+        String str = Integer.toString(number);
+        int left = 0;
+        int right = str.length() - 1;
+
+        while (left < right) {
+            if (str.charAt(left) != str.charAt(right)) {
+                return false; // Not a palindrome
+            }
+            left++;
+            right--;
+        }
+        return true; // It's a palindrome
+    }
+
+    public static void main(String[] args) {
+        SwiftInterpreter interpreter = new SwiftInterpreter();
+
+        // Test the palindrome check
+        int inputNumber = 121;
+        boolean result = interpreter.isPalindrome(inputNumber);
+
+        // Print the result
+        System.out.println(result ? "True" : "False");
+    }
+}
